@@ -244,7 +244,7 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // ENVIAR DADOS COMPACTADOS EM TEMPO REAL PARA O GOOGLE DRIVE VIA APPS SCRIPT (JSON SEM BLOQUEIOS)
+        // CORRIGIDO: ENVIAR COM CONTENT-TYPE COMPATÍVEL SEM USAR NO-CORS
         async function syncToGoogleDrive() {
             if (!WEB_APP_URL || WEB_APP_URL.includes('COLA_AQUI')) return;
             
@@ -254,20 +254,25 @@
             try {
                 const allItems = await getAllItems();
                 
-                // Envia como JSON puro, ideal para chamadas silenciosas automáticas
-                await fetch(WEB_APP_URL, {
+                // Usamos text/plain para evitar o pre-flight do CORS (OPTIONS), mas enviamos a estrutura JSON intacta
+                const response = await fetch(WEB_APP_URL, {
                     method: 'POST',
-                    mode: 'no-cors', // Garante compatibilidade total e imediata sem travar a UI
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({ items: allItems })
                 });
 
-                console.log("Pedido de sincronização em tempo real enviado!");
+                const result = await response.json();
+                console.log("Resposta do Servidor Cloud:", result);
+                
+                if(result.status === "success") {
+                    console.log("Sucesso: " + result.message);
+                } else {
+                    console.warn("Aviso na Cloud: " + result.message);
+                }
             } catch (err) { 
-                console.error("Falha ao ligar à Cloud:", err); 
+                console.error("Falha de rede ao ligar à Cloud:", err); 
             }
             
-            // Remove o indicador visual rapidamente em background
             setTimeout(() => { progressIndicator.classList.add("hidden"); }, 600);
         }
 
