@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gestão de Inventário & Ferramentas</title>
+    <link rel="manifest" href='data:application/manifest+json,{"name":"InvenTech 2026","short_name":"InvenTech","start_url":".","display":"standalone","background_color":"#f8fafc","theme_color":"#2563eb","icons":[{"src":"https://github.com/user-attachments/assets/78790071-93f2-4de7-8db4-dcb8cc28b45b","sizes":"512x512","type":"image/png"}]}' />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        html, body { height: 100%; overflow: hidden; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex flex-col h-screen">
+
+    <div class="bg-slate-50 flex flex-col w-full shadow-sm shrink-0">
+        <header class="bg-white border-b border-slate-200">
+            <div class="max-w-7xl mx-auto px-3 h-11 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <img src="https://github.com/user-attachments/assets/e4e16378-571e-444d-94ef-916a51a81675" alt="Logo" class="h-6 w-auto object-contain">
+                    <h1 class="text-xs font-bold text-slate-900 leading-none hidden xs:inline">InvenTech 2026</h1>
+                </div>
+                
+                <div class="flex items-center gap-1.5">
+                    <button id="btnForceSync" class="flex items-center gap-1 px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-[11px] font-medium transition cursor-pointer shadow-xs" onclick="syncToGoogleDrive()">
+                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                        <span>Sincronizar</span>
+                    </button>
+
+                    <button id="btnClearDB" class="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-md text-xs font-medium transition cursor-pointer" onclick="clearDatabase()" title="Limpar Tudo">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                    
+                    <button id="btnImportExcel" class="flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-medium transition cursor-pointer shadow-xs" onclick="document.getElementById('inputExcelFile').click()">
+                        <i data-lucide="file-spreadsheet" class="w-3 h-3"></i>
+                        <span>Importar</span>
+                    </button>
+                    <input type="file" id="inputExcelFile" accept=".xlsx, .xls" class="hidden" onchange="importFromExcel(event)">
+
+                    <span class="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md ml-1">v1.0.0</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="border-b border-slate-200 bg-slate-50/95 py-1.5">
+            <div class="max-w-7xl mx-auto px-3 flex flex-col gap-1.5">
+                <div class="flex items-center gap-3 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs text-[11px]">
+                    <div class="flex items-center gap-1 border-r border-slate-200 pr-2.5">
+                        <div class="p-0.5 bg-blue-50 text-blue-600 rounded"><i data-lucide="boxes" class="w-3 h-3"></i></div>
+                        <span class="text-slate-500">Itens:</span>
+                        <strong class="text-slate-900 font-bold" id="statTotal">0</strong>
+                    </div>
+                    <div class="flex items-center gap-1 border-r border-slate-200 pr-2.5">
+                        <div class="p-0.5 bg-amber-50 text-amber-600 rounded"><i data-lucide="map-pin" class="w-3 h-3"></i></div>
+                        <span class="text-slate-500">Locais:</span>
+                        <strong class="text-slate-900 font-bold" id="statLocations">0</strong>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <div class="p-0.5 bg-rose-50 text-rose-600 rounded"><i data-lucide="alert-triangle" class="w-3 h-3"></i></div>
+                        <span class="text-slate-500">Notas:</span>
+                        <strong class="text-slate-900 font-bold" id="statAlerts">0</strong>
+                    </div>
+                    <div id="syncProgress" class="hidden flex-1 text-right text-amber-600 font-bold animate-pulse text-[10px]">
+                        Nuvem a atualizar...
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1 sm:flex-row sm:items-center justify-between">
+                    <div class="relative w-full sm:w-64">
+                        <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" id="txtSearch" placeholder="Pesquisar..." class="w-full pl-7 pr-3 py-1 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition" oninput="handleSearch()">
+                    </div>
+                    <div class="grid grid-cols-3 gap-1 w-full sm:w-auto">
+                        <select id="filterTipo" class="py-1 px-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer" onchange="handleSearch()">
+                            <option value="">Tipos</option>
+                        </select>
+                        <select id="filterLocalizacao" class="py-1 px-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer" onchange="handleSearch()">
+                            <option value="">Locais</option>
+                        </select>
+                        <button class="flex items-center justify-center gap-1 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition shadow-xs cursor-pointer" onclick="openModal()">
+                            <i data-lucide="plus" class="w-3 h-3"></i>
+                            <span>Novo</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-2 pt-1 pb-2 overflow-hidden flex flex-col">
+        <div class="bg-white rounded-t-xl border-t border-x border-slate-200 shadow-xs flex-1 overflow-y-auto">
+            <table class="w-full text-left border-collapse table-fixed">
+                <thead class="sticky top-0 z-10 bg-slate-50 shadow-xs">
+                    <tr class="border-b border-slate-200 text-slate-500 text-[10px] font-semibold uppercase tracking-wider">
+                        <th class="px-3 py-2 w-[35%]">Designação</th>
+                        <th class="px-3 py-2 w-[18%]">Tipo</th>
+                        <th class="px-3 py-2 w-[22%]">Local</th>
+                        <th class="px-2 py-2 w-[42px] text-center">QR</th>
+                        <th class="px-2 py-2 text-right w-[55px]">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100 text-xs text-slate-700"></tbody>
+            </table>
+        </div>
+        
+        <div class="bg-white border border-slate-200 rounded-b-xl px-3 py-2 flex items-center justify-between text-[11px] text-slate-500 shrink-0 shadow-sm">
+            <span id="lblPaginationCount" class="font-medium">0 de 0</span>
+            <div id="paginationControlsContainer" class="flex items-center gap-2">
+                <div class="flex items-center gap-1 border-r border-slate-200 pr-2 h-5">
+                    <select id="selectPerPage" class="py-0.5 px-1 border border-slate-200 rounded bg-slate-50 text-slate-700 text-[11px] cursor-pointer focus:outline-none" onchange="handlePerPageChange()">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button id="btnFirstPage" class="p-1 border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-30 transition cursor-pointer" onclick="goToPage(1)"><i data-lucide="chevrons-left" class="w-3 h-3"></i></button>
+                    <button id="btnPrevPage" class="p-1 border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-30 transition cursor-pointer" onclick="changePage(-1)"><i data-lucide="chevron-left" class="w-3 h-3"></i></button>
+                    <div id="containerPageNumbers" class="flex items-center gap-0.5"></div>
+                    <button id="btnNextPage" class="p-1 border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-30 transition cursor-pointer" onclick="changePage(1)"><i data-lucide="chevron-right" class="w-3 h-3"></i></button>
+                    <button id="btnLastPage" class="p-1 border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-30 transition cursor-pointer" onclick="goToLastPage()"><i data-lucide="chevrons-right" class="w-3 h-3"></i></button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="itemModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full overflow-hidden flex flex-col">
+            <div class="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <h2 id="modalTitle" class="text-xs font-bold text-slate-900">Adicionar Novo Item</h2>
+                <button class="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer" onclick="closeModal()"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <form id="itemForm" onsubmit="saveItem(event)" class="p-4 flex flex-col gap-2.5 text-xs">
+                <input type="hidden" id="formId">
+                <div>
+                    <label class="block text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-0.5">Designação *</label>
+                    <input type="text" id="formDesignacao" required class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-0.5">Tipo *</label>
+                        <input type="text" id="formTipo" required list="listTipos" class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-0.5">Localização *</label>
+                        <input type="text" id="formLocalizacao" required list="listLocalizacoes" class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-0.5">Conteúdo Código QR</label>
+                    <input type="text" id="formQR" class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-0.5">Comentários / Notas</label>
+                    <textarea id="formComentarios" rows="2" class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div class="flex items-center justify-end gap-2 mt-1 pt-2.5 border-t border-slate-100">
+                    <button type="button" class="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="px-3 py-1.5 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-xs cursor-pointer">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <datalist id="listTipos"></datalist>
+    <datalist id="listLocalizacoes"></datalist>
+
+    <script>
+        // ================= ENDEREÇO DO TEU GOOGLE APPS SCRIPT INTEGRADO =================
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwIy3CzN7RS_sL7mn_rYRfvUTIIdbUOsm43W-5sTaitWXKosFnFOvaQGVUlkfV75n3xEQ/exec';
+
+        let db = null; let currentData = []; let filteredData = []; let currentPage = 1; let rowsPerPage = 20;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open("InvenTechDB", 1);
+                request.onupgradeneeded = (e) => {
+                    const database = e.target.result;
+                    if (!database.objectStoreNames.contains("items")) { database.createObjectStore("items", { keyPath: "id", autoIncrement: true }); }
+                };
+                request.onsuccess = (e) => { db = e.target.result; resolve(); };
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function loadData() { currentData = await getAllItems(); updateFiltersAndDatalists(); handleSearch(); }
+        function getAllItems() { return new Promise((resolve, reject) => { const tx = db.transaction(["items"], "readonly"); const store = tx.objectStore("items"); const r = store.getAll(); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); }); }
+        function addItem(item) { return new Promise((resolve, reject) => { const tx = db.transaction(["items"], "readwrite"); const store = tx.objectStore("items"); const r = store.add(item); r.onsuccess = () => resolve(); r.onerror = () => reject(r.error); }); }
+        function updateItem(item) { return new Promise((resolve, reject) => { const tx = db.transaction(["items"], "readwrite"); const store = tx.objectStore("items"); const r = store.put(item); r.onsuccess = () => resolve(); r.onerror = () => reject(r.error); }); }
+        function deleteItemFromDB(id) { return new Promise((resolve, reject) => { const tx = db.transaction(["items"], "readwrite"); const store = tx.objectStore("items"); const r = store.delete(id); r.onsuccess = () => resolve(); r.onerror = () => reject(r.error); }); }
+
+        async function clearDatabase() {
+            if (confirm("Apagar tudo localmente?")) {
+                const tx = db.transaction(["items"], "readwrite");
+                tx.objectStore("items").clear().onsuccess = async () => { await loadData(); await syncToGoogleDrive(); };
+            }
+        }
+
+        // IMPORTAÇÃO ASSÍNCRONA EM LOTES SEGUROS DE 50 ITENS
+        function importFromExcel(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    if (jsonData.length === 0) return;
+
+                    document.getElementById("syncProgress").classList.remove("hidden");
+                    const BATCH_SIZE = 50; let currentIndex = 0;
+
+                    async function processBatch() {
+                        const batch = jsonData.slice(currentIndex, currentIndex + BATCH_SIZE);
+                        for (const row of batch) {
+                            const des = row["Designação"] || row["Nome"] || "";
+                            if (des.toString().trim() !== "") {
+                                await addItem({
+                                    designacao: des.toString().trim(),
+                                    localizacao: row["Localização"] || "Sem Localização",
+                                    tipo: row["Tipo"] || "Geral",
+                                    comentarios: row["Comentários"] || "",
+                                    qr: row["Código QR"] || ""
+                                });
+                            }
+                        }
+                        currentIndex += BATCH_SIZE;
+                        if (currentIndex < jsonData.length) { setTimeout(processBatch, 40); } 
+                        else {
+                            document.getElementById("syncProgress").classList.add("hidden");
+                            alert("Importação guardada no dispositivo com sucesso!");
+                            document.getElementById('inputExcelFile').value = "";
+                            await loadData();
+                            await syncToGoogleDrive(); // Sincroniza automaticamente
+                        }
+                    }
+                    await processBatch();
+                } catch (err) { alert("Erro ao ler ficheiro Excel."); }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ENVIAR DADOS COMPACTADOS EM TEMPO REAL PARA O GOOGLE DRIVE VIA APPS SCRIPT (JSON SEM BLOQUEIOS)
+        async function syncToGoogleDrive() {
+            if (!WEB_APP_URL || WEB_APP_URL.includes('COLA_AQUI')) return;
+            
+            const progressIndicator = document.getElementById("syncProgress");
+            progressIndicator.classList.remove("hidden");
+
+            try {
+                const allItems = await getAllItems();
+                
+                // Envia como JSON puro, ideal para chamadas silenciosas automáticas
+                await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Garante compatibilidade total e imediata sem travar a UI
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: allItems })
+                });
+
+                console.log("Pedido de sincronização em tempo real enviado!");
+            } catch (err) { 
+                console.error("Falha ao ligar à Cloud:", err); 
+            }
+            
+            // Remove o indicador visual rapidamente em background
+            setTimeout(() => { progressIndicator.classList.add("hidden"); }, 600);
+        }
+
+        // ================= INTERFACE GRÁFICA & CONTROLO (OTIMIZADO ZEBRA) =================
+        function handleSearch() {
+            const q = document.getElementById("txtSearch").value.toLowerCase();
+            const fT = document.getElementById("filterTipo").value;
+            const fL = document.getElementById("filterLocalizacao").value;
+            filteredData = currentData.filter(i => (i.designacao.toLowerCase().includes(q) || i.tipo.toLowerCase().includes(q) || i.localizacao.toLowerCase().includes(q)) && (!fT || i.tipo === fT) && (!fL || i.localizacao === fL));
+            currentPage = 1; renderTable(); renderKPIs();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById("tableBody"); tbody.innerHTML = "";
+            const total = filteredData.length; const pages = Math.ceil(total / rowsPerPage) || 1;
+            if (currentPage > pages) currentPage = pages;
+            if (total === 0) { tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-6 text-center text-slate-400">Sem registos.</td></tr>`; document.getElementById("lblPaginationCount").innerText = "0 de 0"; return; }
+
+            const start = (currentPage - 1) * rowsPerPage; const end = start + rowsPerPage;
+            filteredData.slice(start, end).forEach(item => {
+                const tr = document.createElement("tr"); tr.className = "hover:bg-slate-50 border-b border-slate-100 h-11";
+                tr.innerHTML = `<td class="px-3 py-1 font-medium text-slate-900 truncate">${item.designacao}</td><td class="px-3 py-1 text-slate-500 truncate">${item.tipo}</td><td class="px-3 py-1 text-slate-500 truncate">${item.localizacao}</td><td class="px-1 py-1 text-center"><div class="inline-block bg-white p-0.5 border border-slate-200 rounded w-8 h-8 flex items-center justify-center" id="qr-${item.id}"></div></td><td class="px-2 py-1 text-right"><div class="flex items-center justify-end gap-1"><button class="p-1 text-slate-400 hover:text-blue-600" onclick="editItem(${item.id})"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button><button class="p-1 text-slate-400 hover:text-rose-600" onclick="deleteItem(${item.id})"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div></td>`;
+                tbody.appendChild(tr);
+                if (item.qr) { new QRCode(document.getElementById(`qr-${item.id}`), { text: item.qr, width: 26, height: 26, correctLevel: QRCode.CorrectLevel.M }); } else { document.getElementById(`qr-${item.id}`).innerHTML = "<span class='text-[8px] text-slate-300'>-</span>"; }
+            });
+
+            const rendered = filteredData.slice(start, end).length;
+            if (rendered < rowsPerPage) {
+                for (let i = 0; i < (rowsPerPage - rendered); i++) {
+                    const bTr = document.createElement("tr"); bTr.className = "h-11 select-none pointer-events-none";
+                    bTr.innerHTML = `<td class="px-3 py-2 text-slate-200">—</td><td class="px-3 py-2 text-slate-200">—</td><td class="px-3 py-2 text-slate-200">—</td><td></td><td></td>`;
+                    tbody.appendChild(bTr);
+                }
+            }
+
+            lucide.createIcons();
+            document.getElementById("lblPaginationCount").innerHTML = `<b>${start + 1}-${Math.min(end, total)}</b> de <b>${total}</b>`;
+            document.getElementById("btnFirstPage").disabled = document.getElementById("btnPrevPage").disabled = (currentPage === 1);
+            document.getElementById("btnNextPage").disabled = document.getElementById("btnLastPage").disabled = (currentPage === pages);
+            renderPageNumbers(pages);
+        }
+
+        function renderPageNumbers(t) { const c = document.getElementById("containerPageNumbers"); c.innerHTML = ""; let s = Math.max(1, currentPage - 1); let e = Math.min(t, s + 2); for (let i = s; i <= e; i++) { const b = document.createElement("button"); b.innerText = i; b.className = i === currentPage ? "px-2 py-0.5 bg-blue-600 text-white font-bold rounded text-[11px]" : "px-2 py-0.5 border border-slate-200 rounded text-[11px] cursor-pointer"; if(i!==currentPage) b.onclick = () => goToPage(i); c.appendChild(b); } }
+        function changePage(d) { currentPage += d; renderTable(); } function goToPage(p) { currentPage = p; renderTable(); } function goToLastPage() { currentPage = Math.ceil(filteredData.length / rowsPerPage) || 1; renderTable(); }
+        function handlePerPageChange() { rowsPerPage = parseInt(document.getElementById("selectPerPage").value); currentPage = 1; renderTable(); }
+        function renderKPIs() { document.getElementById("statTotal").innerText = currentData.length; document.getElementById("statLocations").innerText = [...new Set(currentData.map(i => i.localizacao))].length; document.getElementById("statAlerts").innerText = currentData.filter(i => i.comentarios).length; }
+        function updateFiltersAndDatalists() { const t = [...new Set(currentData.map(i => i.tipo))].sort(); const l = [...new Set(currentData.map(i => i.localizacao))].sort(); const fT = document.getElementById("filterTipo"); const fL = document.getElementById("filterLocalizacao"); fT.innerHTML = '<option value="">Tipos</option>'; fL.innerHTML = '<option value="">Locais</option>'; t.forEach(x => fT.innerHTML += `<option value="${x}">${x}</option>`); l.forEach(x => fL.innerHTML += `<option value="${x}">${x}</option>`); }
+        function openModal(title = "Adicionar Novo Item") { document.getElementById("modalTitle").innerText = title; document.getElementById("itemModal").classList.remove("hidden"); }
+        function closeModal() { document.getElementById("itemModal").classList.add("hidden"); document.getElementById("itemForm").reset(); document.getElementById("formId").value = ""; }
+
+        async function saveItem(e) {
+            e.preventDefault(); const id = document.getElementById("formId").value;
+            const item = { designacao: document.getElementById("formDesignacao").value, tipo: document.getElementById("formTipo").value, localizacao: document.getElementById("formLocalizacao").value, qr: document.getElementById("formQR").value, comentarios: document.getElementById("formComentarios").value };
+            if (id) { item.id = parseInt(id); await updateItem(item); } else { await addItem(item); }
+            closeModal(); await loadData(); 
+            await syncToGoogleDrive(); // Auto-Sincroniza imediatamente com a Cloud em tempo real!
+        }
+
+        function editItem(id) { const item = currentData.find(i => i.id === id); if (!item) return; document.getElementById("formId").value = item.id; document.getElementById("formDesignacao").value = item.designacao; document.getElementById("formTipo").value = item.tipo; document.getElementById("formLocalizacao").value = item.localizacao; document.getElementById("formQR").value = item.qr || ""; document.getElementById("formComentarios").value = item.comentarios || ""; openModal("Editar Item"); }
+        async function deleteItem(id) { if (confirm("Remover item?")) { await deleteItemFromDB(id); await loadData(); await syncToGoogleDrive(); } }
+
+        window.addEventListener('DOMContentLoaded', async () => { lucide.createIcons(); try { await initDB(); await loadData(); } catch (e) { alert('Erro IndexedDB.'); } });
+    </script>
+</body>
+</html>
