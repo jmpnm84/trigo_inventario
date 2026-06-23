@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
         html, body { height: 100%; overflow: hidden; }
     </style>
@@ -45,7 +45,7 @@
                     </button>
                     <input type="file" id="inputExcelFile" accept=".xlsx, .xls" class="hidden" onchange="importFromExcel(event)">
 
-                    <span class="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md ml-1">v1.2.1</span>
+                    <span class="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md ml-1">v1.3.2</span>
                 </div>
             </div>
         </header>
@@ -191,6 +191,43 @@
             });
         }
 
+        // --- NOVA FUNÇÃO DE IMPORTAÇÃO EXCEL ---
+        function importFromExcel(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Converte Excel para JSON (espera cabeçalhos: designacao, tipo, localizacao, comentarios)
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                const tx = db.transaction(["items"], "readwrite");
+                const store = tx.objectStore("items");
+
+                jsonData.forEach(item => {
+                    store.add({
+                        designacao: item.designacao || "Sem Nome",
+                        tipo: item.tipo || "Geral",
+                        localizacao: item.localizacao || "Sem Local",
+                        comentarios: item.comentarios || ""
+                    });
+                });
+
+                tx.oncomplete = async () => {
+                    await loadData();
+                    await syncToGoogleDrive();
+                    alert("Importação concluída com sucesso!");
+                };
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        // ---------------------------------------
+
         async function loadData() { currentData = await getAllItems(); updateFiltersAndDatalists(); handleSearch(); }
         function getAllItems() { return new Promise((resolve, reject) => { const tx = db.transaction(["items"], "readonly"); const store = tx.objectStore("items"); const r = store.getAll(); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); }); }
         function addItem(item) { return new Promise((resolve, reject) => { const tx = db.transaction(["items"], "readwrite"); const store = tx.objectStore("items"); const r = store.add(item); r.onsuccess = () => resolve(); r.onerror = () => reject(r.error); }); }
@@ -208,15 +245,13 @@
             const progressIndicator = document.getElementById("syncProgress");
             progressIndicator.classList.remove("hidden");
             try {
-                // GET request to fetch data
                 const response = await fetch(WEB_APP_URL + "?action=get", { method: 'GET' });
                 const result = await response.json();
                 
-                // Clear local and replace with Drive data
                 const tx = db.transaction(["items"], "readwrite");
                 tx.objectStore("items").clear();
                 result.items.forEach(item => {
-                   delete item.id; // Allow new auto-increment ID
+                   delete item.id; 
                    tx.objectStore("items").add(item);
                 });
                 
