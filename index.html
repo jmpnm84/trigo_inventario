@@ -7,7 +7,6 @@
     <link rel="manifest" href='data:application/manifest+json,{"name":"InvenTech 2026","short_name":"InvenTech","start_url":".","display":"standalone","background_color":"#f8fafc","theme_color":"#2563eb","icons":[{"src":"https://github.com/user-attachments/assets/78790071-93f2-4de7-8db4-dcb8cc28b45b","sizes":"512x512","type":"image/png"}]}' />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -38,12 +37,6 @@
                     <button id="btnClearDB" class="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-md text-xs font-medium transition cursor-pointer" onclick="clearDatabase()" title="Limpar Tudo">
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     </button>
-                    
-                    <button id="btnImportExcel" class="flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-medium transition cursor-pointer shadow-xs" onclick="document.getElementById('inputExcelFile').click()">
-                        <i data-lucide="file-spreadsheet" class="w-3 h-3"></i>
-                        <span>Excel</span>
-                    </button>
-                    <input type="file" id="inputExcelFile" accept=".xlsx, .xls" class="hidden" onchange="importFromExcel(event)">
 
                     <span class="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md ml-1">v1.3.2</span>
                 </div>
@@ -190,43 +183,6 @@
                 request.onerror = (e) => reject(e.target.error);
             });
         }
-
-        // --- NOVA FUNÇÃO DE IMPORTAÇÃO EXCEL ---
-        function importFromExcel(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                const data = new Uint8Array(event.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
-                
-                // Converte Excel para JSON (espera cabeçalhos: designacao, tipo, localizacao, comentarios)
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-                const tx = db.transaction(["items"], "readwrite");
-                const store = tx.objectStore("items");
-
-                jsonData.forEach(item => {
-                    store.add({
-                        designacao: item.designacao || "Sem Nome",
-                        tipo: item.tipo || "Geral",
-                        localizacao: item.localizacao || "Sem Local",
-                        comentarios: item.comentarios || ""
-                    });
-                });
-
-                tx.oncomplete = async () => {
-                    await loadData();
-                    await syncToGoogleDrive();
-                    alert("Importação concluída com sucesso!");
-                };
-            };
-            reader.readAsArrayBuffer(file);
-        }
-        // ---------------------------------------
 
         async function loadData() { currentData = await getAllItems(); updateFiltersAndDatalists(); handleSearch(); }
         function getAllItems() { return new Promise((resolve, reject) => { const tx = db.transaction(["items"], "readonly"); const store = tx.objectStore("items"); const r = store.getAll(); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); }); }
