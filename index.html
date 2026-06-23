@@ -7,7 +7,6 @@
     <link rel="manifest" href='data:application/manifest+json,{"name":"InvenTech 2026","short_name":"InvenTech","start_url":".","display":"standalone","background_color":"#f8fafc","theme_color":"#2563eb","icons":[{"src":"https://github.com/user-attachments/assets/78790071-93f2-4de7-8db4-dcb8cc28b45b","sizes":"512x512","type":"image/png"}]}' />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700&display=swap');
@@ -96,10 +95,9 @@
             <table class="w-full text-left border-collapse table-fixed">
                 <thead class="sticky top-0 z-10 bg-slate-50 shadow-xs">
                     <tr class="border-b border-slate-200 text-slate-500 text-[10px] font-semibold uppercase tracking-wider">
-                        <th class="px-3 py-2 w-[35%]">Designação</th>
-                        <th class="px-3 py-2 w-[18%]">Tipo</th>
-                        <th class="px-3 py-2 w-[22%]">Local</th>
-                        <th class="px-2 py-2 w-[42px] text-center">QR</th>
+                        <th class="px-3 py-2 w-[40%]">Designação</th>
+                        <th class="px-3 py-2 w-[25%]">Tipo</th>
+                        <th class="px-3 py-2 w-[25%]">Local</th>
                         <th class="px-2 py-2 text-right w-[55px]">Ações</th>
                     </tr>
                 </thead>
@@ -151,12 +149,8 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-0.5">Conteúdo Código QR</label>
-                    <input type="text" id="formQR" class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
                     <label class="block text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-0.5">Comentários / Notas</label>
-                    <textarea id="formComentarios" rows="2" class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    <textarea id="formComentarios" rows="3" class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                 </div>
                 <div class="flex items-center justify-end gap-2 mt-1 pt-2.5 border-t border-slate-100">
                     <button type="button" class="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer" onclick="closeModal()">Cancelar</button>
@@ -200,7 +194,6 @@
             }
         }
 
-        // IMPORTAÇÃO ASSÍNCRONA EM LOTES SEGUROS DE 50 ITENS
         function importFromExcel(event) {
             const file = event.target.files[0]; if (!file) return;
             const reader = new FileReader();
@@ -223,8 +216,7 @@
                                     designacao: des.toString().trim(),
                                     localizacao: row["Localização"] || "Sem Localização",
                                     tipo: row["Tipo"] || "Geral",
-                                    comentarios: row["Comentários"] || "",
-                                    qr: row["Código QR"] || ""
+                                    comentarios: row["Comentários"] || ""
                                 });
                             }
                         }
@@ -235,7 +227,7 @@
                             alert("Importação guardada no dispositivo com sucesso!");
                             document.getElementById('inputExcelFile').value = "";
                             await loadData();
-                            await syncToGoogleDrive(); // Sincroniza automaticamente
+                            await syncToGoogleDrive();
                         }
                     }
                     await processBatch();
@@ -244,7 +236,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // CORRIGIDO: ENVIAR COM CONTENT-TYPE COMPATÍVEL SEM USAR NO-CORS
         async function syncToGoogleDrive() {
             if (!WEB_APP_URL || WEB_APP_URL.includes('COLA_AQUI')) return;
             
@@ -254,7 +245,6 @@
             try {
                 const allItems = await getAllItems();
                 
-                // Usamos text/plain para evitar o pre-flight do CORS (OPTIONS), mas enviamos a estrutura JSON intacta
                 const response = await fetch(WEB_APP_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
@@ -263,12 +253,6 @@
 
                 const result = await response.json();
                 console.log("Resposta do Servidor Cloud:", result);
-                
-                if(result.status === "success") {
-                    console.log("Sucesso: " + result.message);
-                } else {
-                    console.warn("Aviso na Cloud: " + result.message);
-                }
             } catch (err) { 
                 console.error("Falha de rede ao ligar à Cloud:", err); 
             }
@@ -276,7 +260,6 @@
             setTimeout(() => { progressIndicator.classList.add("hidden"); }, 600);
         }
 
-        // ================= INTERFACE GRÁFICA & CONTROLO (OTIMIZADO ZEBRA) =================
         function handleSearch() {
             const q = document.getElementById("txtSearch").value.toLowerCase();
             const fT = document.getElementById("filterTipo").value;
@@ -289,21 +272,20 @@
             const tbody = document.getElementById("tableBody"); tbody.innerHTML = "";
             const total = filteredData.length; const pages = Math.ceil(total / rowsPerPage) || 1;
             if (currentPage > pages) currentPage = pages;
-            if (total === 0) { tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-6 text-center text-slate-400">Sem registos.</td></tr>`; document.getElementById("lblPaginationCount").innerText = "0 de 0"; return; }
+            if (total === 0) { tbody.innerHTML = `<tr><td colspan="4" class="px-3 py-6 text-center text-slate-400">Sem registos.</td></tr>`; document.getElementById("lblPaginationCount").innerText = "0 de 0"; return; }
 
             const start = (currentPage - 1) * rowsPerPage; const end = start + rowsPerPage;
             filteredData.slice(start, end).forEach(item => {
                 const tr = document.createElement("tr"); tr.className = "hover:bg-slate-50 border-b border-slate-100 h-11";
-                tr.innerHTML = `<td class="px-3 py-1 font-medium text-slate-900 truncate">${item.designacao}</td><td class="px-3 py-1 text-slate-500 truncate">${item.tipo}</td><td class="px-3 py-1 text-slate-500 truncate">${item.localizacao}</td><td class="px-1 py-1 text-center"><div class="inline-block bg-white p-0.5 border border-slate-200 rounded w-8 h-8 flex items-center justify-center" id="qr-${item.id}"></div></td><td class="px-2 py-1 text-right"><div class="flex items-center justify-end gap-1"><button class="p-1 text-slate-400 hover:text-blue-600" onclick="editItem(${item.id})"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button><button class="p-1 text-slate-400 hover:text-rose-600" onclick="deleteItem(${item.id})"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div></td>`;
+                tr.innerHTML = `<td class="px-3 py-1 font-medium text-slate-900 truncate">${item.designacao}</td><td class="px-3 py-1 text-slate-500 truncate">${item.tipo}</td><td class="px-3 py-1 text-slate-500 truncate">${item.localizacao}</td><td class="px-2 py-1 text-right"><div class="flex items-center justify-end gap-1"><button class="p-1 text-slate-400 hover:text-blue-600" onclick="editItem(${item.id})"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button><button class="p-1 text-slate-400 hover:text-rose-600" onclick="deleteItem(${item.id})"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div></td>`;
                 tbody.appendChild(tr);
-                if (item.qr) { new QRCode(document.getElementById(`qr-${item.id}`), { text: item.qr, width: 26, height: 26, correctLevel: QRCode.CorrectLevel.M }); } else { document.getElementById(`qr-${item.id}`).innerHTML = "<span class='text-[8px] text-slate-300'>-</span>"; }
             });
 
             const rendered = filteredData.slice(start, end).length;
             if (rendered < rowsPerPage) {
                 for (let i = 0; i < (rowsPerPage - rendered); i++) {
                     const bTr = document.createElement("tr"); bTr.className = "h-11 select-none pointer-events-none";
-                    bTr.innerHTML = `<td class="px-3 py-2 text-slate-200">—</td><td class="px-3 py-2 text-slate-200">—</td><td class="px-3 py-2 text-slate-200">—</td><td></td><td></td>`;
+                    bTr.innerHTML = `<td class="px-3 py-2 text-slate-200">—</td><td class="px-3 py-2 text-slate-200">—</td><td class="px-3 py-2 text-slate-200">—</td><td></td>`;
                     tbody.appendChild(bTr);
                 }
             }
@@ -325,13 +307,13 @@
 
         async function saveItem(e) {
             e.preventDefault(); const id = document.getElementById("formId").value;
-            const item = { designacao: document.getElementById("formDesignacao").value, tipo: document.getElementById("formTipo").value, localizacao: document.getElementById("formLocalizacao").value, qr: document.getElementById("formQR").value, comentarios: document.getElementById("formComentarios").value };
+            const item = { designacao: document.getElementById("formDesignacao").value, tipo: document.getElementById("formTipo").value, localizacao: document.getElementById("formLocalizacao").value, comentarios: document.getElementById("formComentarios").value };
             if (id) { item.id = parseInt(id); await updateItem(item); } else { await addItem(item); }
             closeModal(); await loadData(); 
-            await syncToGoogleDrive(); // Auto-Sincroniza imediatamente com a Cloud em tempo real!
+            await syncToGoogleDrive();
         }
 
-        function editItem(id) { const item = currentData.find(i => i.id === id); if (!item) return; document.getElementById("formId").value = item.id; document.getElementById("formDesignacao").value = item.designacao; document.getElementById("formTipo").value = item.tipo; document.getElementById("formLocalizacao").value = item.localizacao; document.getElementById("formQR").value = item.qr || ""; document.getElementById("formComentarios").value = item.comentarios || ""; openModal("Editar Item"); }
+        function editItem(id) { const item = currentData.find(i => i.id === id); if (!item) return; document.getElementById("formId").value = item.id; document.getElementById("formDesignacao").value = item.designacao; document.getElementById("formTipo").value = item.tipo; document.getElementById("formLocalizacao").value = item.localizacao; document.getElementById("formComentarios").value = item.comentarios || ""; openModal("Editar Item"); }
         async function deleteItem(id) { if (confirm("Remover item?")) { await deleteItemFromDB(id); await loadData(); await syncToGoogleDrive(); } }
 
         window.addEventListener('DOMContentLoaded', async () => { lucide.createIcons(); try { await initDB(); await loadData(); } catch (e) { alert('Erro IndexedDB.'); } });
